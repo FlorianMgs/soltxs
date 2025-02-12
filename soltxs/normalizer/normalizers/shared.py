@@ -1,4 +1,5 @@
 from typing import List
+import base64
 
 from soltxs.normalizer.models import (
     AddressTableLookup,
@@ -18,10 +19,11 @@ def instructions(instr: dict) -> Instruction:
     Returns:
         An Instruction object.
     """
+
     return Instruction(
         programIdIndex=instr["programIdIndex"],
         data=instr.get("data", ""),
-        accounts=instr.get("accounts", []),
+        accounts=list(base64.b64decode(instr.get("accounts", ""))),
         stackHeight=instr.get("stackHeight", None),
     )
 

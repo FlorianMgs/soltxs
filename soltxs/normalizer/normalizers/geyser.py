@@ -2,6 +2,9 @@ from typing import List
 
 from soltxs.normalizer import models
 from soltxs.normalizer.normalizers import shared
+from soltxs.utils import make_readable
+
+import base64
 
 
 def normalize(tx: dict) -> models.Transaction:
@@ -31,8 +34,8 @@ def normalize(tx: dict) -> models.Transaction:
 
     # Consolidate loadedAddresses.
     loaded_addresses = models.LoadedAddresses(
-        writable=geyser_meta.get("loadedWritableAddresses", []),
-        readonly=geyser_meta.get("loadedReadonlyAddresses", []),
+        writable=[make_readable(_addr) for _addr in geyser_meta.get("loadedWritableAddresses", [])],
+        readonly=[make_readable(_addr) for _addr in geyser_meta.get("loadedReadonlyAddresses", [])],
     )
 
     # Geyser doesn't provide blockTime.
@@ -47,7 +50,7 @@ def normalize(tx: dict) -> models.Transaction:
     address_table_lookups: List[models.AddressTableLookup] = [shared.address_lookup(lu) for lu in raw_lookups]
 
     # Normalize program IDs in accountKeys.
-    account_keys = shared.program_id(message["accountKeys"])
+    account_keys = [make_readable(_key) for _key in message["accountKeys"]]
 
     # Parse token balances.
     raw_pre_tb = geyser_meta.get("preTokenBalances", [])
@@ -71,7 +74,18 @@ def normalize(tx: dict) -> models.Transaction:
             postBalances=geyser_meta.get("postBalances", []),
             preTokenBalances=pre_token_balances,
             postTokenBalances=post_token_balances,
-            innerInstructions=geyser_meta.get("innerInstructions", []),
+            innerInstructions=[{
+                "index": _inner["index"],
+                "instructions": [
+                    {
+                        "programIdIndex": _instr["programIdIndex"],
+                        "data": _instr["data"],
+                        "accounts": list(base64.b64decode(_instr["accounts"])),
+                        "stackHeight": _instr["stackHeight"],
+                    }
+                    for _instr in _inner["instructions"]
+                ]
+            } for _inner in geyser_meta.get("innerInstructions", [])],
             logMessages=geyser_meta.get("logMessages", []),
             err=geyser_meta.get("err"),
             status=geyser_meta.get("status", {"Ok": None}),

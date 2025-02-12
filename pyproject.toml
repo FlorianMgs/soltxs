@@ -1,2 +1,19 @@
 [tool.ruff]
 line-length = 200
+
+[tool.poetry]
+name = "soltxs"
+version = "0.1.0"
+description = ""
+authors = ["Felipe Faria", "FlorianMgs"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+qbase58 = "^1.0.4"
+qborsh = "^1.0.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

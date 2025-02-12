@@ -2,6 +2,9 @@ from dataclasses import dataclass
 from typing import List, Optional, Union
 
 import qbase58 as base58
+import base64
+
+from pprint import pprint
 
 from soltxs.normalizer.models import Instruction, Transaction
 from soltxs.parser.models import ParsedInstruction, Program
@@ -352,7 +355,12 @@ class _TokenProgramParser(Program[ParsedInstructions]):
         Returns:
             A parsed token program instruction.
         """
-        raw_data = base58.decode(instr_dict.get("data", ""))
+        encoded_data = instr_dict.get("data", "")
+        try:
+            raw_data = base58.decode(encoded_data)
+        except ValueError:
+            raw_data = base64.b64decode(encoded_data)
+
         discriminator = self.desc(raw_data)
         parser_func = self.desc_map.get(discriminator, self.desc_map.get("default"))
         return parser_func(

@@ -2,6 +2,7 @@ from typing import Any, Dict, List
 
 from soltxs.normalizer.models import Transaction
 from soltxs.parser import addons, models, parsers
+from soltxs.utils import make_readable
 
 # Map program IDs to their corresponding parser classes.
 id_to_handler: Dict[str, models.Program] = {

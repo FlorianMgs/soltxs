@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Dict, Generic, Optional, TypeVar
 
 import qbase58 as base58
+import base64
 
 from soltxs.normalizer.models import Instruction, Transaction
 
@@ -67,11 +68,17 @@ class Program(abc.ABC, Generic[T_Program]):
         instr: Instruction = tx.message.instructions[instruction_index]
 
         # Decode the instruction data (base58-decoded).
-        decoded_data = base58.decode(instr.data or "")
+        try:
+            decoded_data = base58.decode(instr.data or "")
+        except ValueError:
+            decoded_data = base64.b64decode(instr.data or "")
+
         discriminator = self.desc(decoded_data)
         parser_func = self.desc_map.get(discriminator, self.desc_map.get("default"))
+
         if not parser_func:
-            raise NotImplementedError(f"Unknown {self.__class__.__name__} discriminator: {discriminator}")
+            # raise NotImplementedError(f"Unknown {self.__class__.__name__} discriminator: {discriminator}")
+            return None
 
         return parser_func(tx, instruction_index, decoded_data)
 

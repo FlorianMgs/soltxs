@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Union
 
 import qbase58 as base58
+import base64
 
 from soltxs.normalizer.models import Instruction, Transaction
 from soltxs.parser.models import ParsedInstruction, Program
@@ -74,7 +75,11 @@ class _RaydiumAMMParser(Program[ParsedInstructions]):
         accounts = instr.accounts
 
         # Re-decode the instruction data (to ensure consistency) using base58.
-        decoded_data = base58.decode(instr.data or "")
+        try:
+            decoded_data = base58.decode(instr.data or "")
+        except ValueError:
+            decoded_data = base64.b64decode(instr.data or "")
+
         # Extract the input amount and minimum output amount.
         amount_in = int.from_bytes(decoded_data[1:9], byteorder="little", signed=False)
         minimum_amount_out = int.from_bytes(decoded_data[9:17], byteorder="little", signed=False)
