@@ -36,7 +36,7 @@ class Swap(ParsedInstruction):
     to_token_amount: int
     to_token_decimals: int
     minimum_amount_out: int
-
+    signature: str
 
 ParsedInstructions = Union[Swap]
 
@@ -137,6 +137,7 @@ class _RaydiumAMMParser(Program[ParsedInstructions]):
             to_token_amount=to_token_amount,
             to_token_decimals=to_token_decimals,
             minimum_amount_out=minimum_amount_out,
+            signature=tx.signatures[0],
         )
 
 

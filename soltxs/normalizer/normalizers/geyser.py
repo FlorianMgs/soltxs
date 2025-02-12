@@ -29,7 +29,7 @@ def normalize(tx: dict) -> models.Transaction:
     geyser_meta = geyser_txn["meta"]
 
     real_txn = geyser_txn["transaction"]
-    signatures = real_txn["signatures"]
+    signatures = [make_readable(_sig) for _sig in real_txn["signatures"]]
     message = real_txn["message"]
 
     # Consolidate loadedAddresses.

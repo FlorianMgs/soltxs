@@ -30,6 +30,7 @@ class Raydium(Resolve):
     to_token: str
     to_amount: int
     minimum_amount_out: int
+    signature: str
 
 
 class _RaydiumResolver(Resolver):
@@ -65,6 +66,7 @@ class _RaydiumResolver(Resolver):
                 to_token=instr.to_token,
                 to_amount=instr.to_token_amount / 10**instr.to_token_decimals,
                 minimum_amount_out=instr.minimum_amount_out / 10**instr.to_token_decimals,
+                signature=instr.signature,
             )
 
 

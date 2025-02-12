@@ -3,7 +3,7 @@ line-length = 200
 
 [tool.poetry]
 name = "soltxs"
-version = "0.1.0"
+version = "0.1.1"
 description = ""
 authors = ["Felipe Faria", "FlorianMgs"]
 readme = "README.md"
