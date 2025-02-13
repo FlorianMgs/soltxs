@@ -25,6 +25,7 @@ class PumpFun(Resolve):
     from_amount: int
     to_token: str
     to_amount: int
+    signature: str
 
 
 class _PumpFunResolver(Resolver):
@@ -46,6 +47,7 @@ class _PumpFunResolver(Resolver):
         if len(instrs) == 1:
             instr = instrs[0]
             return PumpFun(
+                signature=instr.signature,
                 type=instr.instruction_name.lower(),
                 who=instr.who,
                 from_token=instr.from_token,

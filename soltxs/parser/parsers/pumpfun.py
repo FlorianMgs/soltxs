@@ -30,6 +30,7 @@ class Create(ParsedInstruction):
         uri: Token metadata URI.
     """
 
+    signature: str
     who: Optional[str]
     mint: Optional[str]
     mint_authority: Optional[str]
@@ -57,6 +58,7 @@ class Buy(ParsedInstruction):
         to_token_amount: Raw amount of the to token.
     """
 
+    signature: str
     who: str
     from_token: str
     from_token_decimals: int
@@ -81,6 +83,7 @@ class Sell(ParsedInstruction):
         to_token_amount: Raw amount of the to token.
     """
 
+    signature: str
     who: str
     from_token: str
     from_token_decimals: int
@@ -179,6 +182,7 @@ class _PumpFunParser(Program[ParsedInstructions]):
         to_decimals = self._get_token_decimals(tx, to_token)
 
         return Buy(
+            signature=tx.signatures[0],
             program_id=self.program_id,
             program_name=self.program_name,
             instruction_name="Buy",
@@ -219,6 +223,7 @@ class _PumpFunParser(Program[ParsedInstructions]):
         to_decimals = SOL_DECIMALS
 
         return Sell(
+            signature=tx.signatures[0],
             program_id=self.program_id,
             program_name=self.program_name,
             instruction_name="Sell",
@@ -255,6 +260,7 @@ class _PumpFunParser(Program[ParsedInstructions]):
         if len(instr.accounts) > 7:
             who = tx.all_accounts[instr.accounts[7]]
         return Create(
+            signature=tx.signatures[0],
             program_id=self.program_id,
             program_name=self.program_name,
             instruction_name="Create",
