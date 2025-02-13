@@ -1,3 +1,4 @@
+import hashlib
 from dataclasses import dataclass
 from typing import Union, List
 
@@ -5,14 +6,13 @@ import qbase58 as base58
 import qborsh
 import base64
 
-from soltxs.normalizer.models import Transaction
+from soltxs.normalizer.models import Instruction, Transaction
 from soltxs.parser.models import ParsedInstruction, Program
 
 WSOL_MINT = "So11111111111111111111111111111111111111112"
 SOL_DECIMALS = 9
 # Allowed inner instruction program id from pump fun operations.
 PUMPFUN_PROGRAM_ID = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
-
 
 @qborsh.schema
 class SwapData:
@@ -33,14 +33,13 @@ class SwapData:
     is_buy: qborsh.Bool
     user: qborsh.PubKey
 
-
 @dataclass(slots=True)
 class Buy(ParsedInstruction):
     """
     Parsed instruction for a Mortem 'Buy' operation.
 
     Attributes:
-        who: Buyer’s account.
+        who: Buyer's account.
         from_token: The token paid (SOL).
         from_token_decimals: Decimals for SOL.
         to_token: The token being bought.
@@ -57,14 +56,13 @@ class Buy(ParsedInstruction):
     from_token_amount: int
     to_token_amount: int
 
-
 @dataclass(slots=True)
 class Sell(ParsedInstruction):
     """
     Parsed instruction for a Mortem 'Sell' operation.
 
     Attributes:
-        who: Seller’s account.
+        who: Seller's account.
         from_token: The token being sold.
         from_token_decimals: Decimals for the sold token.
         to_token: The token received (SOL).
@@ -81,38 +79,24 @@ class Sell(ParsedInstruction):
     from_token_amount: int
     to_token_amount: int
 
-
 ParsedInstructions = Union[Buy, Sell]
 
-
-class _MortemParser(Program[ParsedInstruction]):
+class _MortemParser(Program[ParsedInstructions]):
     program_id = "FAdo9NCw1ssek6Z6yeWzWjhLVsr8uiCwcWNUnKgzTnHe"
     program_name = "Mortem"
     
     def desc(self, data: bytes) -> bytes:
         return data[:4]
 
-    # Routing map for parsing Buy vs Sell based on the first 4 bytes of data.
+    # The routing map now includes a default handler that checks 
+    # for buy swap data first and then falling back to sell.
     desc_map = {
         b"buy\x00": lambda tx, idx, data: _MortemParser().parse_buy(tx, idx, data),
         b"sell": lambda tx, idx, data: _MortemParser().parse_sell(tx, idx, data),
-        "default": lambda tx, idx, data: _MortemParser().parse_buy(tx, idx, data),
+        "default": lambda tx, idx, data: _MortemParser().parse_default(tx, idx, data),
     }
 
-    def _get_field(self, swap, field: str):
-        """
-        Helper method to retrieve a field from swap data whether it is a dict or object.
-        """
-        return swap[field] if isinstance(swap, dict) else getattr(swap, field)
-
-    def parse_buy(
-        self, tx: Transaction, instruction_index: int, decoded_data: bytes
-    ) -> Buy:
-        """
-        Parses a Mortem buy operation (for legacy transactions).
-        It locates inner instructions (from Mortem or PumpFun) with swap data
-        and returns a Buy object when `is_buy` is True.
-        """
+    def parse_buy(self, tx: Transaction, instruction_index: int, decoded_data: bytes) -> Buy:
         swap_list: List = self._parse_swap(tx, instruction_index)
         buy_data = None
         for swap in swap_list:
@@ -122,7 +106,6 @@ class _MortemParser(Program[ParsedInstruction]):
         if buy_data is None:
             raise ValueError("No buy swap data found in inner instructions")
         who = str(self._get_field(buy_data, "user"))
-        # For a buy, SOL is paid so it is our `from_token`
         from_token = WSOL_MINT
         to_token = str(self._get_field(buy_data, "mint"))
         from_amount = int(self._get_field(buy_data, "sol_amount"))
@@ -143,16 +126,10 @@ class _MortemParser(Program[ParsedInstruction]):
             to_token_amount=to_amount,
         )
 
-    def parse_sell(
-        self, tx: Transaction, instruction_index: int, decoded_data: bytes
-    ) -> Sell:
-        """
-        Parses a Mortem sell operation using inner instructions.
-        """
+    def parse_sell(self, tx: Transaction, instruction_index: int, decoded_data: bytes) -> Sell:
         swap_list: List = self._parse_swap(tx, instruction_index)
         sell_data = None
         for swap in swap_list:
-            # If it is not a buy, then this swap is a sell operation.
             if not self._get_field(swap, "is_buy"):
                 sell_data = swap
                 break
@@ -178,6 +155,21 @@ class _MortemParser(Program[ParsedInstruction]):
             from_token_amount=from_amount,
             to_token_amount=to_amount,
         )
+
+    def parse_default(self, tx: Transaction, instruction_index: int, decoded_data: bytes) -> ParsedInstructions:
+        """
+        Unified parser for both buy and sell. It checks the inner instructions for
+        swap data first and returns a buy if any swap is flagged as is_buy. Otherwise,
+        it falls back to a sell operation.
+        """
+        swap_list: List = self._parse_swap(tx, instruction_index)
+        for swap in swap_list:
+            if self._get_field(swap, "is_buy"):
+                return self.parse_buy(tx, instruction_index, decoded_data)
+        for swap in swap_list:
+            if not self._get_field(swap, "is_buy"):
+                return self.parse_sell(tx, instruction_index, decoded_data)
+        raise ValueError("No valid swap data found in inner instructions")
 
     def _parse_swap(self, tx: Transaction, instruction_index: int) -> List:
         """
@@ -223,5 +215,13 @@ class _MortemParser(Program[ParsedInstruction]):
                 return tb.uiTokenAmount.decimals
         raise ValueError(f"Could not find decimals for mint {mint}")
 
+    def _get_field(self, data, field: str):
+        """
+        Helper method to retrieve a field from swap data.
+        Works whether data is returned as a dict or an object.
+        """
+        if isinstance(data, dict):
+            return data.get(field)
+        return getattr(data, field)
 
 MortemParser = _MortemParser()
