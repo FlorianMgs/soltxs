@@ -4,7 +4,7 @@ from typing import List, Optional, Union
 
 import qbase58 as base58
 import qborsh
-
+import base64
 from soltxs.normalizer.models import Instruction, Transaction
 from soltxs.parser.models import ParsedInstruction, Program
 
@@ -297,8 +297,11 @@ class _PumpFunParser(Program[ParsedInstructions]):
             sub_prog_id = tx.all_accounts[in_instr["programIdIndex"]]
             if sub_prog_id != top_prog_id:
                 continue
+            try:
+                raw_data = base58.decode(in_instr.get("data", ""))
+            except ValueError:
+                raw_data = base64.b64decode(in_instr.get("data", ""))
 
-            raw_data = base58.decode(in_instr.get("data", ""))
             if len(raw_data) < 16:
                 continue
 
