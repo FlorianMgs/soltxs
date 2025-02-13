@@ -75,13 +75,13 @@ def normalize(tx: dict) -> models.Transaction:
             preTokenBalances=pre_token_balances,
             postTokenBalances=post_token_balances,
             innerInstructions=[{
-                "index": _inner["index"],
+                "index": _inner.get("index", 0),
                 "instructions": [
                     {
-                        "programIdIndex": _instr["programIdIndex"],
-                        "data": _instr["data"],
-                        "accounts": list(base64.b64decode(_instr["accounts"])),
-                        "stackHeight": _instr["stackHeight"],
+                        "programIdIndex": _instr.get("programIdIndex", 0),
+                        "data": _instr.get("data", ""),
+                        "accounts": list(base64.b64decode(_instr.get("accounts", ""))),
+                        "stackHeight": _instr.get("stackHeight", 0),
                     }
                     for _instr in _inner["instructions"]
                 ]
