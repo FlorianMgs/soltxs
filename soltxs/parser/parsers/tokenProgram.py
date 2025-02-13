@@ -4,9 +4,7 @@ from typing import List, Optional, Union
 import qbase58 as base58
 import base64
 
-from pprint import pprint
-
-from soltxs.normalizer.models import Instruction, Transaction
+from soltxs.normalizer.models import Transaction
 from soltxs.parser.models import ParsedInstruction, Program
 
 

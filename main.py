@@ -3,13 +3,17 @@ import soltxs
 from pprint import pprint
 
 if __name__ == "__main__":
-    with open("pump.json", "r") as f:
+    with open("bot_tx.json", "r") as f:
         tx = json.load(f)
 
     normalized = soltxs.normalize(tx)
     # pprint(normalized)
+    # print("-" * 100)
     parsed = soltxs.parse(normalized)
-    pprint(parsed.get("instructions"))
+    pprint(parsed)
     print("-" * 100)
-    processed = soltxs.process(tx)
-    pprint(processed)
+    # resolved = soltxs.resolve(parsed)
+    # pprint(resolved)
+    # print("-" * 100)
+    # processed = soltxs.process(tx)
+    # pprint(processed)

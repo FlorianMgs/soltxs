@@ -52,6 +52,7 @@ class Message:
     recentBlockhash: str
     instructions: List[Instruction]
     addressTableLookups: List[AddressTableLookup]
+    versioned: bool
 
 
 @dataclass(slots=True)

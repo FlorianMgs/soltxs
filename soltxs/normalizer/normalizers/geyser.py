@@ -31,6 +31,7 @@ def normalize(tx: dict) -> models.Transaction:
     real_txn = geyser_txn["transaction"]
     signatures = [make_readable(_sig) for _sig in real_txn["signatures"]]
     message = real_txn["message"]
+    versioned = message.get("versioned", False)
 
     # Consolidate loadedAddresses.
     loaded_addresses = models.LoadedAddresses(
@@ -67,6 +68,7 @@ def normalize(tx: dict) -> models.Transaction:
             recentBlockhash=message["recentBlockhash"],
             instructions=instructions,
             addressTableLookups=address_table_lookups,
+            versioned=versioned,
         ),
         meta=models.Meta(
             fee=geyser_meta.get("fee", 0),

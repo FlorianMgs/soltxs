@@ -2,7 +2,6 @@ from typing import Any, Dict, List
 
 from soltxs.normalizer.models import Transaction
 from soltxs.parser import addons, models, parsers
-from soltxs.utils import make_readable
 
 # Map program IDs to their corresponding parser classes.
 id_to_handler: Dict[str, models.Program] = {
@@ -11,6 +10,7 @@ id_to_handler: Dict[str, models.Program] = {
     parsers.tokenProgram.TokenProgramParser.program_id: parsers.tokenProgram.TokenProgramParser,
     parsers.raydiumAMM.RaydiumAMMParser.program_id: parsers.raydiumAMM.RaydiumAMMParser,
     parsers.pumpfun.PumpFunParser.program_id: parsers.pumpfun.PumpFunParser,
+    parsers.mortem.MortemParser.program_id: parsers.mortem.MortemParser,
 }
 
 # List of addon enrichers for additional data.
