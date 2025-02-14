@@ -89,6 +89,7 @@ def parse(tx: Transaction) -> Dict[str, Any]:
         # Determine the program id for the instruction.
         program_id = tx.message.accountKeys[instruction.programIdIndex]
         # Select the appropriate parser; default to UnknownParser if not found.
+        print(program_id)
         router = id_to_handler.get(program_id, parsers.unknown.UnknownParser(program_id))
         action = router.route(tx, idx)
         parsed_instructions.append(action)
