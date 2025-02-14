@@ -50,7 +50,7 @@ def deduplicate_instructions(instructions: List[Any]) -> List[Any]:
     # Do all processing in a single loop
     for ins in flat_iter:
         cls_name = ins.__class__.__name__
-        if cls_name in ("Buy", "Sell"):
+        if cls_name in ("Buy", "Sell", "Swap"):
             key = (
                 ins.signature,
                 ins.instruction_name,

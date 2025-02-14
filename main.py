@@ -4,7 +4,7 @@ from pprint import pprint
 import time
 
 if __name__ == "__main__":
-    with open("example_txs/raydium_swap.json", "r") as f:
+    with open("example_txs/unknown/pump4.json", "r") as f:
         tx = json.load(f)
 
     print("## NORMALIZED")
@@ -17,9 +17,9 @@ if __name__ == "__main__":
     end = time.time()
     print(f"Time taken: {end - start} seconds")
     pprint(parsed)
-    # print("-" * 100)
-    # resolved = soltxs.resolve(parsed)
-    # pprint(resolved)
+    print("-" * 100)
+    resolved = soltxs.resolve(parsed)
+    pprint(resolved)
     # print("-" * 100)
     # processed = soltxs.process(tx)
     # pprint(processed)
