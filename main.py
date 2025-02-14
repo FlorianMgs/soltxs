@@ -1,17 +1,23 @@
 import json
 import soltxs
 from pprint import pprint
+import time
 
 if __name__ == "__main__":
-    with open("bot_sell.json", "r") as f:
+    with open("example_txs/unknown/pump3.json", "r") as f:
         tx = json.load(f)
 
+    print("## NORMALIZED")
     normalized = soltxs.normalize(tx)
-    pprint(normalized)
+    # pprint(normalized)
     print("-" * 100)
+    print("## PARSED")
+    start = time.time()
     parsed = soltxs.parse(normalized)
+    end = time.time()
+    print(f"Time taken: {end - start} seconds")
     pprint(parsed)
-    print("-" * 100)
+    # print("-" * 100)
     # resolved = soltxs.resolve(parsed)
     # pprint(resolved)
     # print("-" * 100)
