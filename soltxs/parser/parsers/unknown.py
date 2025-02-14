@@ -8,6 +8,7 @@ from soltxs.normalizer.models import Transaction
 from soltxs.parser.models import ParsedInstruction, Program
 from soltxs.parser.parsers.mortem import Buy, Sell, WSOL_MINT, SOL_DECIMALS, SwapData, PUMPFUN_PROGRAM_ID
 
+RAYDIUM_AMM_PROGRAM_ID = "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"
 BLACKLIST_PROGRAM_IDS = {
     "111111111111111111111111111111111",
     "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
@@ -114,7 +115,7 @@ class UnknownParser(Program):
                         token_amount,
                         sol_amount,
                     )
-            except ValueError:
+            except (ValueError, AttributeError):
                 # Skip swap events whose mint address is not a token (likely a wallet).
                 continue
 
@@ -158,7 +159,7 @@ class UnknownParser(Program):
             instructions = group.get("instructions", [])
             for in_instr in instructions:
                 sub_prog_id = tx.all_accounts[in_instr["programIdIndex"]]
-                if sub_prog_id != PUMPFUN_PROGRAM_ID:
+                if sub_prog_id != PUMPFUN_PROGRAM_ID and sub_prog_id != RAYDIUM_AMM_PROGRAM_ID:
                     continue
                 try:
                     raw_data = base58.decode(in_instr.get("data", ""))
@@ -189,7 +190,7 @@ class UnknownParser(Program):
 
         for instr in tx.message.instructions:
             sub_prog_id = tx.message.accountKeys[instr.programIdIndex]
-            if sub_prog_id != PUMPFUN_PROGRAM_ID:
+            if sub_prog_id != PUMPFUN_PROGRAM_ID and sub_prog_id != RAYDIUM_AMM_PROGRAM_ID:
                 continue
             try:
                 raw_data = base58.decode(instr.data)
