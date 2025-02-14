@@ -73,46 +73,51 @@ class UnknownParser(Program):
             mint = str(self._get_field(swap, "mint"))
             sol_amount = int(self._get_field(swap, "sol_amount"))
             token_amount = int(self._get_field(swap, "token_amount"))
-            if is_buy:
-                # For buy: from_token = WSOL_MINT and to_token = mint.
-                from_token = WSOL_MINT
-                from_decimals = SOL_DECIMALS
-                to_token = mint
-                to_decimals = self._get_token_decimals(tx, mint)
-                instruction_name = "Buy"
-                # In Buy, the amounts are: from_token_amount = sol_amount, to_token_amount = token_amount.
-                key = (
-                    signature,
-                    origin,
-                    instruction_name,
-                    user,
-                    from_token,
-                    from_decimals,
-                    to_token,
-                    to_decimals,
-                    sol_amount,
-                    token_amount,
-                )
-            else:
-                # For sell: from_token = mint and to_token = WSOL_MINT.
-                from_token = mint
-                from_decimals = self._get_token_decimals(tx, mint)
-                to_token = WSOL_MINT
-                to_decimals = SOL_DECIMALS
-                instruction_name = "Sell"
-                # In Sell, the amounts are: from_token_amount = token_amount, to_token_amount = sol_amount.
-                key = (
-                    signature,
-                    origin,
-                    instruction_name,
-                    user,
-                    from_token,
-                    from_decimals,
-                    to_token,
-                    to_decimals,
-                    token_amount,
-                    sol_amount,
-                )
+            try:
+                if is_buy:
+                    # For buy: from_token = WSOL_MINT and to_token = mint.
+                    from_token = WSOL_MINT
+                    from_decimals = SOL_DECIMALS
+                    to_token = mint
+                    to_decimals = self._get_token_decimals(tx, mint)
+                    instruction_name = "Buy"
+                    # In Buy, the amounts are: from_token_amount = sol_amount, to_token_amount = token_amount.
+                    key = (
+                        signature,
+                        origin,
+                        instruction_name,
+                        user,
+                        from_token,
+                        from_decimals,
+                        to_token,
+                        to_decimals,
+                        sol_amount,
+                        token_amount,
+                    )
+                else:
+                    # For sell: from_token = mint and to_token = WSOL_MINT.
+                    from_token = mint
+                    from_decimals = self._get_token_decimals(tx, mint)
+                    to_token = WSOL_MINT
+                    to_decimals = SOL_DECIMALS
+                    instruction_name = "Sell"
+                    # In Sell, the amounts are: from_token_amount = token_amount, to_token_amount = sol_amount.
+                    key = (
+                        signature,
+                        origin,
+                        instruction_name,
+                        user,
+                        from_token,
+                        from_decimals,
+                        to_token,
+                        to_decimals,
+                        token_amount,
+                        sol_amount,
+                    )
+            except ValueError:
+                # Skip swap events whose mint address is not a token (likely a wallet).
+                continue
+
             if key not in seen:
                 seen.add(key)
                 unique_events.append((swap, origin))
