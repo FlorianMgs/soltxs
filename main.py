@@ -4,7 +4,7 @@ from pprint import pprint
 import time
 
 if __name__ == "__main__":
-    with open("example_txs/pump_mint2.json", "r") as f:
+    with open("example_txs/raydium_0.json", "r") as f:
         tx = json.load(f)
 
     print("## NORMALIZED")

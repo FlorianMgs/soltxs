@@ -84,7 +84,7 @@ class _RaydiumAMMParser(Program[ParsedInstructions]):
         amount_in = int.from_bytes(decoded_data[1:9], byteorder="little", signed=False)
         minimum_amount_out = int.from_bytes(decoded_data[9:17], byteorder="little", signed=False)
 
-        # Identify the user accounts based on positions.
+        # Identify user accounts based on known positions.
         user_source = tx.all_accounts[accounts[-3]]
         user_destination = tx.all_accounts[accounts[-2]]
         who = tx.all_accounts[accounts[-1]]
@@ -109,6 +109,7 @@ class _RaydiumAMMParser(Program[ParsedInstructions]):
                 to_token = tb.mint
                 to_token_decimals = tb.uiTokenAmount.decimals
 
+        # By default, we assume no inner transfer was detected.
         to_token_amount = 0
         inner_instrs = []
         # Find inner instructions corresponding to this instruction index.
@@ -117,13 +118,52 @@ class _RaydiumAMMParser(Program[ParsedInstructions]):
                 inner_instrs.extend(i_group["instructions"])
                 break
 
-        # Process inner instructions for token transfers.
         for in_instr in inner_instrs:
             prog_id = tx.all_accounts[in_instr["programIdIndex"]]
             if prog_id == TokenProgramParser.program_id:
                 action = TokenProgramParser.route_instruction(tx, in_instr)
                 if action.instruction_name in ["Transfer", "TransferChecked"] and action.to == user_destination:
                     to_token_amount = action.amount
+
+        # --- Additional logic for sell transactions ---
+        if to_token == WSOL_MINT and to_token_amount == 0:
+            # First attempt: use preTokenBalances and postTokenBalances to compute the delta.
+            candidate_amount: int = 0
+            candidate_decimals: int = SOL_DECIMALS
+
+            # Build a mapping of WSOL amounts from postTokenBalances keyed by accountIndex.
+            post_wsol: dict[int, int] = {}
+            for tb in tx.meta.postTokenBalances:
+                if tb.mint == WSOL_MINT and tb.uiTokenAmount and tb.uiTokenAmount.amount:
+                    post_wsol[tb.accountIndex] = int(tb.uiTokenAmount.amount)
+
+            for tb in tx.meta.preTokenBalances:
+                if tb.mint == WSOL_MINT and tb.uiTokenAmount and tb.uiTokenAmount.amount:
+                    pre_amount = int(tb.uiTokenAmount.amount)
+                    post_amount = post_wsol.get(tb.accountIndex, pre_amount)
+                    delta = pre_amount - post_amount
+                    if delta > candidate_amount:
+                        candidate_amount = delta
+                        candidate_decimals = tb.uiTokenAmount.decimals
+
+            if candidate_amount > 0:
+                to_token_amount = candidate_amount
+                to_token_decimals = candidate_decimals
+            else:
+                # Fallback: Attempt to decode ray logs.
+                for log in tx.meta.logMessages:
+                    if "ray_log:" in log:
+                        try:
+                            raw_log = log.split("ray_log:")[1].strip()
+                            decoded_log = base58.decode(raw_log)
+                            # If the ray log follows a similar structure, e.g., [discriminator (1 byte)] + [unused (8 bytes)] + [amount (8 bytes)]
+                            if len(decoded_log) >= 17:
+                                candidate_amount = int.from_bytes(decoded_log[9:17], byteorder="little", signed=False)
+                                if candidate_amount > 0:
+                                    to_token_amount = candidate_amount
+                                    break
+                        except Exception:
+                            continue
 
         return Swap(
             program_id=self.program_id,

@@ -49,6 +49,8 @@ class _RaydiumResolver(Resolver):
             A Raydium resolved object if a swap instruction is found, else None.
         """
         instrs = [i for i in instructions if isinstance(i, parser.parsers.raydiumAMM.Swap)]
+        if len(instrs) > 1:
+            instrs = [i for i in instrs if i.to_token_amount > 0 and i.from_token_amount > 0]
         if len(instrs) == 1:
             instr = instrs[0]
 
