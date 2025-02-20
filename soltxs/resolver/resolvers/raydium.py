@@ -64,6 +64,16 @@ class _RaydiumResolver(Resolver):
             elif instr.to_token in {WSOL_MINT, SOL_MINT}:
                 raydium_type = "sell"
 
+            pre_token_balance_has_decimals = "." in str(instr.pre_token_balance) if instr.pre_token_balance is not None else False
+            post_token_balance_has_decimals = "." in str(instr.post_token_balance) if instr.post_token_balance is not None else False
+            if pre_token_balance_has_decimals:
+                formatted_pre_token_balance = int(instr.pre_token_balance) / 10**instr.from_token_decimals
+            else:
+                formatted_pre_token_balance = instr.pre_token_balance
+            if post_token_balance_has_decimals:
+                formatted_post_token_balance = int(instr.post_token_balance) / 10**instr.from_token_decimals
+            else:
+                formatted_post_token_balance = instr.post_token_balance
             return Raydium(
                 type=raydium_type,
                 who=instr.who,
@@ -73,8 +83,8 @@ class _RaydiumResolver(Resolver):
                 to_amount=instr.to_token_amount / 10**instr.to_token_decimals,
                 minimum_amount_out=instr.minimum_amount_out / 10**instr.to_token_decimals,
                 signature=instr.signature,
-                pre_token_balance=int(instr.pre_token_balance) / 10**instr.from_token_decimals if instr.pre_token_balance else None,
-                post_token_balance=int(instr.post_token_balance) / 10**instr.from_token_decimals if instr.post_token_balance else None,
+                pre_token_balance=formatted_pre_token_balance,
+                post_token_balance=formatted_post_token_balance,
                 pre_sol_balance=int(instr.pre_sol_balance) / 10**9 if instr.pre_sol_balance else None,
                 post_sol_balance=int(instr.post_sol_balance) / 10**9 if instr.post_sol_balance else None,
             )
