@@ -484,11 +484,11 @@ class UnknownParser(Program):
 
         pre_token_balance = next(
             (int(tb.uiTokenAmount.amount) for tb in tx.meta.preTokenBalances if tb.accountIndex == source_account_index),
-            None,
+            0,
         )
         post_token_balance = next(
             (int(tb.uiTokenAmount.amount) for tb in tx.meta.postTokenBalances if tb.accountIndex == source_account_index),
-            None,
+            0,
         )
 
         # --- Retrieve SOL balances using the wallet account index (accounts[-1]). ---
@@ -500,12 +500,12 @@ class UnknownParser(Program):
         pre_sol_balance = (
             tx.meta.preBalances[wallet_account_index]
             if wallet_account_index < len(tx.meta.preBalances)
-            else None
+            else 0
         )
         post_sol_balance = (
             tx.meta.postBalances[wallet_account_index]
             if wallet_account_index < len(tx.meta.postBalances)
-            else None
+            else 0
         )
 
         combined_tb = []
@@ -562,7 +562,7 @@ class UnknownParser(Program):
                         try:
                             raw_log = log.split("ray_log:")[1].strip()
                             decoded_log = base58.decode(raw_log)
-                            # Expecting a structure: [discriminator (1 byte)] + [unused (8 bytes)] + [amount (8 bytes)]
+                            # Expecting structure: [discriminator (1 byte)] + [unused (8 bytes)] + [amount (8 bytes)]
                             if len(decoded_log) >= 17:
                                 candidate_amount = int.from_bytes(decoded_log[9:17], byteorder="little", signed=False)
                                 if candidate_amount > 0:
@@ -570,6 +570,22 @@ class UnknownParser(Program):
                                     break
                         except Exception:
                             continue
+
+        # --- Additional check for buy transactions ---
+        # For a buy, the received token (to_token) is sent to the destination account at index -2.
+        is_buy = from_token == WSOL_MINT and to_token != WSOL_MINT
+        if is_buy and accounts and len(accounts) >= 2:
+            destination_account_index = accounts[-2]
+            pre_token_balance_candidate = next(
+                (int(tb.uiTokenAmount.amount) for tb in tx.meta.preTokenBalances if tb.accountIndex == destination_account_index), 0
+            )
+            post_token_balance_candidate = next(
+                (int(tb.uiTokenAmount.amount) for tb in tx.meta.postTokenBalances if tb.accountIndex == destination_account_index), 0
+            )
+            if post_token_balance_candidate == 0:
+                post_token_balance_candidate = to_token_amount
+            pre_token_balance = pre_token_balance_candidate
+            post_token_balance = post_token_balance_candidate
 
         return Swap(
             signature=tx.signatures[0],
@@ -638,35 +654,50 @@ class UnknownParser(Program):
             RA_SOL_DECIMALS = SOL_DECIMALS
             from soltxs.parser.parsers.raydiumAMM import Swap
 
-        who: str = drop_candidate.owner
-
-        # --- Retrieve token balances using drop_candidate's account index ---
-        candidate_account_index = drop_candidate.accountIndex
-        pre_token_balance = next(
-            (int(tb.uiTokenAmount.amount) for tb in tx.meta.preTokenBalances if tb.accountIndex == candidate_account_index),
-            None,
-        )
-        post_token_balance = next(
-            (int(tb.uiTokenAmount.amount) for tb in tx.meta.postTokenBalances if tb.accountIndex == candidate_account_index),
-            None,
-        )
+        # Determine if this is a buy: the user paid with WSOL (drop_candidate) and received another token (increase_candidate)
+        is_buy = drop_candidate.mint == WSOL_MINT and increase_candidate and (increase_candidate.mint != WSOL_MINT)
+        # --- Retrieve token balance(s) ---
+        if is_buy:
+            # Use the increase candidate (destination account) for the bought token.
+            destination_account_index = increase_candidate.accountIndex
+            pre_token_balance = next(
+                (int(tb.uiTokenAmount.amount) for tb in tx.meta.preTokenBalances if tb.accountIndex == destination_account_index), 0
+            )
+            post_token_balance = next(
+                (int(tb.uiTokenAmount.amount) for tb in tx.meta.postTokenBalances if tb.accountIndex == destination_account_index), 0
+            )
+            if post_token_balance == 0:
+                post_token_balance = increase_amount
+        else:
+            candidate_account_index = drop_candidate.accountIndex
+            pre_token_balance = next(
+                (int(tb.uiTokenAmount.amount) for tb in tx.meta.preTokenBalances if tb.accountIndex == candidate_account_index),
+                0,
+            )
+            post_token_balance = next(
+                (int(tb.uiTokenAmount.amount) for tb in tx.meta.postTokenBalances if tb.accountIndex == candidate_account_index),
+                0,
+            )
 
         # --- Retrieve SOL balances using the user's main wallet ---
         try:
-            wallet_account_index = tx.all_accounts.index(who)
+            wallet_account_index = tx.all_accounts.index(drop_candidate.owner)
         except ValueError:
             wallet_account_index = 0
 
         pre_sol_balance = (
             tx.meta.preBalances[wallet_account_index]
             if wallet_account_index < len(tx.meta.preBalances)
-            else None
+            else 0
         )
         post_sol_balance = (
             tx.meta.postBalances[wallet_account_index]
             if wallet_account_index < len(tx.meta.postBalances)
-            else None
+            else 0
         )
+
+        # For identification, use drop_candidate.owner; note in buy the buyer is the owner of the WSOL account.
+        who: str = drop_candidate.owner
 
         return Swap(
             signature=tx.signatures[0],
