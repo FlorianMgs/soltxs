@@ -31,6 +31,10 @@ class Raydium(Resolve):
     to_amount: int
     minimum_amount_out: int
     signature: str
+    pre_token_balance: int | None
+    post_token_balance: int | None
+    pre_sol_balance: int | None
+    post_sol_balance: int | None
 
 
 class _RaydiumResolver(Resolver):
@@ -69,6 +73,10 @@ class _RaydiumResolver(Resolver):
                 to_amount=instr.to_token_amount / 10**instr.to_token_decimals,
                 minimum_amount_out=instr.minimum_amount_out / 10**instr.to_token_decimals,
                 signature=instr.signature,
+                pre_token_balance=int(instr.pre_token_balance) / 10**instr.from_token_decimals if instr.pre_token_balance else None,
+                post_token_balance=int(instr.post_token_balance) / 10**instr.from_token_decimals if instr.post_token_balance else None,
+                pre_sol_balance=int(instr.pre_sol_balance) / 10**9 if instr.pre_sol_balance else None,
+                post_sol_balance=int(instr.post_sol_balance) / 10**9 if instr.post_sol_balance else None,
             )
 
 

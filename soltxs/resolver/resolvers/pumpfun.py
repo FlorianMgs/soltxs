@@ -26,6 +26,10 @@ class PumpFun(Resolve):
     to_token: str
     to_amount: int
     signature: str
+    pre_token_balance: int | None
+    post_token_balance: int | None
+    pre_sol_balance: int | None
+    post_sol_balance: int | None
 
 
 class _PumpFunResolver(Resolver):
@@ -54,6 +58,10 @@ class _PumpFunResolver(Resolver):
                 from_amount=instr.from_token_amount / 10**instr.from_token_decimals,
                 to_token=instr.to_token,
                 to_amount=instr.to_token_amount / 10**instr.to_token_decimals,
+                pre_token_balance=int(instr.pre_token_balance) / 10**instr.from_token_decimals if instr.pre_token_balance else None,
+                post_token_balance=int(instr.post_token_balance) / 10**instr.from_token_decimals if instr.post_token_balance else None,
+                pre_sol_balance=int(instr.pre_sol_balance) / 10**9 if instr.pre_sol_balance else None,
+                post_sol_balance=int(instr.post_sol_balance) / 10**9 if instr.post_sol_balance else None,
             )
 
 

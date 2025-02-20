@@ -55,6 +55,10 @@ class Buy(ParsedInstruction):
     to_token_decimals: int
     from_token_amount: int
     to_token_amount: int
+    pre_token_balance: int | None
+    post_token_balance: int | None
+    pre_sol_balance: int | None
+    post_sol_balance: int | None
 
 @dataclass(slots=True)
 class Sell(ParsedInstruction):
@@ -78,6 +82,10 @@ class Sell(ParsedInstruction):
     to_token_decimals: int
     from_token_amount: int
     to_token_amount: int
+    pre_token_balance: int | None
+    post_token_balance: int | None
+    pre_sol_balance: int | None
+    post_sol_balance: int | None
 
 ParsedInstructions = Union[Buy, Sell]
 
@@ -112,6 +120,24 @@ class _MortemParser(Program[ParsedInstructions]):
         to_amount = int(self._get_field(buy_data, "token_amount"))
         from_decimals = SOL_DECIMALS
         to_decimals = self._get_token_decimals(tx, to_token)
+
+        pre_token_balance = 0
+        pre_sol_balance = 0
+        post_token_balance = 0
+        post_sol_balance = 0
+
+        for tb in tx.meta.preTokenBalances:
+            if tb.mint == WSOL_MINT and tb.owner == who:
+                pre_sol_balance = tb.uiTokenAmount.amount
+            if tb.mint == to_token and tb.owner == who:
+                pre_token_balance = tb.uiTokenAmount.amount
+
+        for tb in tx.meta.postTokenBalances:
+            if tb.mint == WSOL_MINT and tb.owner == who:
+                post_sol_balance = tb.uiTokenAmount.amount
+            if tb.mint == to_token and tb.owner == who:
+                post_token_balance = tb.uiTokenAmount.amount
+
         return Buy(
             signature=tx.signatures[0],
             program_id=self.program_id,
@@ -124,6 +150,10 @@ class _MortemParser(Program[ParsedInstructions]):
             to_token_decimals=to_decimals,
             from_token_amount=from_amount,
             to_token_amount=to_amount,
+            pre_token_balance=pre_token_balance,
+            post_token_balance=post_token_balance,
+            pre_sol_balance=pre_sol_balance,
+            post_sol_balance=post_sol_balance,
         )
 
     def parse_sell(self, tx: Transaction, instruction_index: int, decoded_data: bytes) -> Sell:
@@ -142,6 +172,24 @@ class _MortemParser(Program[ParsedInstructions]):
         to_amount = int(self._get_field(sell_data, "sol_amount"))
         from_decimals = self._get_token_decimals(tx, from_token)
         to_decimals = SOL_DECIMALS
+
+        pre_token_balance = 0
+        pre_sol_balance = 0
+        post_token_balance = 0
+        post_sol_balance = 0
+
+        for tb in tx.meta.preTokenBalances:
+            if tb.mint == WSOL_MINT and tb.owner == who:
+                pre_sol_balance = tb.uiTokenAmount.amount
+            if tb.mint == from_token and tb.owner == who:
+                pre_token_balance = tb.uiTokenAmount.amount
+
+        for tb in tx.meta.postTokenBalances:
+            if tb.mint == WSOL_MINT and tb.owner == who:
+                post_sol_balance = tb.uiTokenAmount.amount
+            if tb.mint == from_token and tb.owner == who:
+                post_token_balance = tb.uiTokenAmount.amount
+
         return Sell(
             signature=tx.signatures[0],
             program_id=self.program_id,
@@ -154,6 +202,10 @@ class _MortemParser(Program[ParsedInstructions]):
             to_token_decimals=to_decimals,
             from_token_amount=from_amount,
             to_token_amount=to_amount,
+            pre_token_balance=pre_token_balance,
+            post_token_balance=post_token_balance,
+            pre_sol_balance=pre_sol_balance,
+            post_sol_balance=post_sol_balance,
         )
 
     def parse_default(self, tx: Transaction, instruction_index: int, decoded_data: bytes) -> ParsedInstructions:

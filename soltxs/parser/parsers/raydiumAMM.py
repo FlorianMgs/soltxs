@@ -26,6 +26,10 @@ class Swap(ParsedInstruction):
         to_token_amount: Raw amount of the to token.
         to_token_decimals: Decimals for the to token.
         minimum_amount_out: Minimum amount expected from the swap.
+        pre_token_balance: User's token account balance before the swap.
+        post_token_balance: User's token account balance after the swap.
+        pre_sol_balance: User's SOL balance before the swap.
+        post_sol_balance: User's SOL balance after the swap.
     """
 
     who: str
@@ -37,6 +41,10 @@ class Swap(ParsedInstruction):
     to_token_decimals: int
     minimum_amount_out: int
     signature: str
+    pre_token_balance: int | None
+    post_token_balance: int | None
+    pre_sol_balance: int | None
+    post_sol_balance: int | None
 
 ParsedInstructions = Union[Swap]
 
@@ -95,7 +103,34 @@ class _RaydiumAMMParser(Program[ParsedInstructions]):
         to_token = WSOL_MINT
         to_token_decimals = SOL_DECIMALS
 
-        # Consolidate token balances from pre and post balances.
+        # --- Retrieve pre and post balances ---
+
+        # For the token, we take the 'source' account (accounts[-3]) as the one to track.
+        source_account_index = accounts[-3]
+        pre_token_balance = next(
+            (int(tb.uiTokenAmount.amount) for tb in tx.meta.preTokenBalances if tb.accountIndex == source_account_index),
+            None,
+        )
+        post_token_balance = next(
+            (int(tb.uiTokenAmount.amount) for tb in tx.meta.postTokenBalances if tb.accountIndex == source_account_index),
+            None,
+        )
+
+        # For SOL, we use the main user wallet ('who', accounts[-1]). We assume that the
+        # preBalances and postBalances lists in tx.meta align with tx.all_accounts.
+        wallet_account_index = accounts[-1]
+        pre_sol_balance = (
+            tx.meta.preBalances[wallet_account_index]
+            if wallet_account_index < len(tx.meta.preBalances)
+            else None
+        )
+        post_sol_balance = (
+            tx.meta.postBalances[wallet_account_index]
+            if wallet_account_index < len(tx.meta.postBalances)
+            else None
+        )
+
+        # Consolidate token balances from pre and post balances to update token mint and decimals.
         combined_tb = []
         combined_tb.extend(tx.meta.preTokenBalances)
         combined_tb.extend(tx.meta.postTokenBalances)
@@ -109,7 +144,7 @@ class _RaydiumAMMParser(Program[ParsedInstructions]):
                 to_token = tb.mint
                 to_token_decimals = tb.uiTokenAmount.decimals
 
-        # By default, we assume no inner transfer was detected.
+        # --- Process inner instructions to capture transfer amounts ---
         to_token_amount = 0
         inner_instrs = []
         # Find inner instructions corresponding to this instruction index.
@@ -156,7 +191,8 @@ class _RaydiumAMMParser(Program[ParsedInstructions]):
                         try:
                             raw_log = log.split("ray_log:")[1].strip()
                             decoded_log = base58.decode(raw_log)
-                            # If the ray log follows a similar structure, e.g., [discriminator (1 byte)] + [unused (8 bytes)] + [amount (8 bytes)]
+                            # If the ray log follows a similar structure, e.g.,
+                            # [discriminator (1 byte)] + [unused (8 bytes)] + [amount (8 bytes)]
                             if len(decoded_log) >= 17:
                                 candidate_amount = int.from_bytes(decoded_log[9:17], byteorder="little", signed=False)
                                 if candidate_amount > 0:
@@ -178,6 +214,10 @@ class _RaydiumAMMParser(Program[ParsedInstructions]):
             to_token_decimals=to_token_decimals,
             minimum_amount_out=minimum_amount_out,
             signature=tx.signatures[0],
+            pre_token_balance=pre_token_balance,
+            post_token_balance=post_token_balance,
+            pre_sol_balance=pre_sol_balance,
+            post_sol_balance=post_sol_balance,
         )
 
 

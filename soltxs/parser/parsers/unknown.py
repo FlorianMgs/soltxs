@@ -267,6 +267,24 @@ class UnknownParser(Program):
         to_amount: int = int(self._get_field(swap, "token_amount"))
         from_decimals: int = SOL_DECIMALS
         to_decimals: int = self._get_token_decimals(tx, to_token)
+
+        pre_token_balance = 0
+        pre_sol_balance = 0
+        post_token_balance = 0
+        post_sol_balance = 0
+
+        for tb in tx.meta.preTokenBalances:
+            if tb.mint == WSOL_MINT and tb.owner == who:
+                pre_sol_balance = tb.uiTokenAmount.amount
+            if tb.mint == to_token and tb.owner == who:
+                pre_token_balance = tb.uiTokenAmount.amount
+
+        for tb in tx.meta.postTokenBalances:
+            if tb.mint == WSOL_MINT and tb.owner == who:
+                post_sol_balance = tb.uiTokenAmount.amount
+            if tb.mint == to_token and tb.owner == who:
+                post_token_balance = tb.uiTokenAmount.amount
+
         return Buy(
             signature=tx.signatures[0],
             program_id=origin_program_id,
@@ -279,6 +297,10 @@ class UnknownParser(Program):
             to_token_decimals=to_decimals,
             from_token_amount=from_amount,
             to_token_amount=to_amount,
+            pre_token_balance=pre_token_balance,
+            post_token_balance=post_token_balance,
+            pre_sol_balance=pre_sol_balance,
+            post_sol_balance=post_sol_balance,
         )
 
     def _build_sell(self, tx: Transaction, swap: SwapData, origin_program_id: str) -> Sell:
@@ -293,6 +315,24 @@ class UnknownParser(Program):
         to_amount: int = int(self._get_field(swap, "sol_amount"))
         from_decimals: int = self._get_token_decimals(tx, from_token)
         to_decimals: int = SOL_DECIMALS
+
+        pre_token_balance = 0
+        pre_sol_balance = 0
+        post_token_balance = 0
+        post_sol_balance = 0
+
+        for tb in tx.meta.preTokenBalances:
+            if tb.mint == WSOL_MINT and tb.owner == who:
+                pre_sol_balance = tb.uiTokenAmount.amount
+            if tb.mint == from_token and tb.owner == who:
+                pre_token_balance = tb.uiTokenAmount.amount
+
+        for tb in tx.meta.postTokenBalances:
+            if tb.mint == WSOL_MINT and tb.owner == who:
+                post_sol_balance = tb.uiTokenAmount.amount
+            if tb.mint == from_token and tb.owner == who:
+                post_token_balance = tb.uiTokenAmount.amount
+            
         return Sell(
             signature=tx.signatures[0],
             program_id=origin_program_id,
@@ -305,6 +345,10 @@ class UnknownParser(Program):
             to_token_decimals=to_decimals,
             from_token_amount=from_amount,
             to_token_amount=to_amount,
+            pre_token_balance=pre_token_balance,
+            post_token_balance=post_token_balance,
+            pre_sol_balance=pre_sol_balance,
+            post_sol_balance=post_sol_balance,
         )
 
     def _get_token_decimals(self, tx: Transaction, mint: str) -> int:
@@ -406,7 +450,7 @@ class UnknownParser(Program):
         if tx.message and hasattr(tx.message, "instructions") and 0 <= instruction_index < len(tx.message.instructions):
             instr = tx.message.instructions[instruction_index]
             accounts = instr.accounts
-        # Use defaults from raydium (could be different from pump fun's WSOL_MINT/SOL_DECIMALS)
+
         try:
             from soltxs.parser.parsers.raydiumAMM import WSOL_MINT as RA_WSOL_MINT, SOL_DECIMALS as RA_SOL_DECIMALS
         except Exception:
@@ -432,6 +476,38 @@ class UnknownParser(Program):
             user_source = who
             user_destination = who
 
+        # --- Retrieve pre and post token balances using the source account index. ---
+        if accounts and len(accounts) >= 3:
+            source_account_index = accounts[-3]
+        else:
+            source_account_index = 0
+
+        pre_token_balance = next(
+            (int(tb.uiTokenAmount.amount) for tb in tx.meta.preTokenBalances if tb.accountIndex == source_account_index),
+            None,
+        )
+        post_token_balance = next(
+            (int(tb.uiTokenAmount.amount) for tb in tx.meta.postTokenBalances if tb.accountIndex == source_account_index),
+            None,
+        )
+
+        # --- Retrieve SOL balances using the wallet account index (accounts[-1]). ---
+        if accounts and len(accounts) >= 1:
+            wallet_account_index = accounts[-1]
+        else:
+            wallet_account_index = 0
+
+        pre_sol_balance = (
+            tx.meta.preBalances[wallet_account_index]
+            if wallet_account_index < len(tx.meta.preBalances)
+            else None
+        )
+        post_sol_balance = (
+            tx.meta.postBalances[wallet_account_index]
+            if wallet_account_index < len(tx.meta.postBalances)
+            else None
+        )
+
         combined_tb = []
         if tx.meta:
             combined_tb.extend(tx.meta.preTokenBalances or [])
@@ -445,6 +521,7 @@ class UnknownParser(Program):
                 to_token = tb.mint
                 to_token_decimals = tb.uiTokenAmount.decimals
 
+        # --- Process inner instructions to capture transfer amounts ---
         to_token_amount: int = 0
         if tx.meta and tx.meta.innerInstructions:
             for i_group in tx.meta.innerInstructions:
@@ -457,6 +534,7 @@ class UnknownParser(Program):
                             action = TokenProgramParser.route_instruction(tx, in_instr)
                             if action.instruction_name in ["Transfer", "TransferChecked"] and getattr(action, "to", None) == user_destination:
                                 to_token_amount = action.amount
+
         return Swap(
             signature=tx.signatures[0],
             program_id=RAYDIUM_AMM_PROGRAM_ID,
@@ -470,6 +548,10 @@ class UnknownParser(Program):
             to_token_amount=to_token_amount,
             to_token_decimals=to_token_decimals,
             minimum_amount_out=minimum_amount_out,
+            pre_token_balance=pre_token_balance,
+            post_token_balance=post_token_balance,
+            pre_sol_balance=pre_sol_balance,
+            post_sol_balance=post_sol_balance,
         )
 
     def _infer_raydium_swap(self, tx: Transaction) -> Swap:
@@ -521,6 +603,35 @@ class UnknownParser(Program):
             from soltxs.parser.parsers.raydiumAMM import Swap
 
         who: str = drop_candidate.owner
+
+        # --- Retrieve token balances using drop_candidate's account index ---
+        candidate_account_index = drop_candidate.accountIndex
+        pre_token_balance = next(
+            (int(tb.uiTokenAmount.amount) for tb in tx.meta.preTokenBalances if tb.accountIndex == candidate_account_index),
+            None,
+        )
+        post_token_balance = next(
+            (int(tb.uiTokenAmount.amount) for tb in tx.meta.postTokenBalances if tb.accountIndex == candidate_account_index),
+            None,
+        )
+
+        # --- Retrieve SOL balances using the user's main wallet ---
+        try:
+            wallet_account_index = tx.all_accounts.index(who)
+        except ValueError:
+            wallet_account_index = 0
+
+        pre_sol_balance = (
+            tx.meta.preBalances[wallet_account_index]
+            if wallet_account_index < len(tx.meta.preBalances)
+            else None
+        )
+        post_sol_balance = (
+            tx.meta.postBalances[wallet_account_index]
+            if wallet_account_index < len(tx.meta.postBalances)
+            else None
+        )
+
         return Swap(
             signature=tx.signatures[0],
             program_id=RAYDIUM_AMM_PROGRAM_ID,
@@ -534,4 +645,8 @@ class UnknownParser(Program):
             to_token_amount=increase_amount,
             to_token_decimals=increase_candidate.uiTokenAmount.decimals,
             minimum_amount_out=0,
+            pre_token_balance=pre_token_balance,
+            post_token_balance=post_token_balance,
+            pre_sol_balance=pre_sol_balance,
+            post_sol_balance=post_sol_balance,
         )
