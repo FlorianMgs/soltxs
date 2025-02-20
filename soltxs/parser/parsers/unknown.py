@@ -535,6 +535,42 @@ class UnknownParser(Program):
                             if action.instruction_name in ["Transfer", "TransferChecked"] and getattr(action, "to", None) == user_destination:
                                 to_token_amount = action.amount
 
+        # --- Fallback if inner instructions do not yield a transfer amount ---
+        if to_token_amount == 0:
+            candidate_amount: int = 0
+            # Attempt to infer the token credit by comparing pre and post balances on non‑WSOL accounts.
+            for tb in tx.meta.postTokenBalances:
+                if tb.mint != WSOL_MINT and tb.owner == who:
+                    pre_amt = 0
+                    for pre_tb in tx.meta.preTokenBalances:
+                        if pre_tb.accountIndex == tb.accountIndex:
+                            pre_amt = int(pre_tb.uiTokenAmount.amount)
+                            break
+                    post_amt = int(tb.uiTokenAmount.amount)
+                    delta = post_amt - pre_amt
+                    if delta > candidate_amount:
+                        candidate_amount = delta
+                        to_token = tb.mint
+                        to_token_decimals = tb.uiTokenAmount.decimals
+            if candidate_amount > 0:
+                to_token_amount = candidate_amount
+
+            # If still zero, attempt to decode the token amount from log messages.
+            if to_token_amount == 0 and tx.meta and hasattr(tx.meta, "logMessages"):
+                for log in tx.meta.logMessages:
+                    if "ray_log:" in log:
+                        try:
+                            raw_log = log.split("ray_log:")[1].strip()
+                            decoded_log = base58.decode(raw_log)
+                            # Expecting a structure: [discriminator (1 byte)] + [unused (8 bytes)] + [amount (8 bytes)]
+                            if len(decoded_log) >= 17:
+                                candidate_amount = int.from_bytes(decoded_log[9:17], byteorder="little", signed=False)
+                                if candidate_amount > 0:
+                                    to_token_amount = candidate_amount
+                                    break
+                        except Exception:
+                            continue
+
         return Swap(
             signature=tx.signatures[0],
             program_id=RAYDIUM_AMM_PROGRAM_ID,
